@@ -1,4 +1,4 @@
-# FocusMon — Plan Directeur
+# Fokutchi — Plan Directeur
 
 > App de focalisation gamifiée style Tamagotchi × Forest, multijoueur, avec monétisation ads + IAP.
 > Ce document trace TOUTES les décisions : ce qui a été proposé, retenu, écarté, et pourquoi.
@@ -44,7 +44,7 @@ FOCUS (timer réel) → ÉNERGIE DE FOCUS → ACTIONS CRÉATURES → RÉCOMPENSE
 
 ## 2. Game Design Document (GDD)
 
-### 2.1 Les Créatures (FocusMons)
+### 2.1 Les Créatures (Fokutchis)
 
 #### Attributs de base
 | Attribut | Description |
@@ -85,20 +85,34 @@ C'est la mécanique centrale qui rend chaque créature unique et personnelle.
 > Implications techniques : le serveur doit tracker non seulement la durée cumulée mais aussi
 > la distribution temporelle des sessions (heure, durée, fréquence, streaks).
 
-#### Compétences
+#### Compétences (Skills)
+
+Chaque compétence est définie par un modèle `skills` et est **restreinte par archétype/classe**.
+Un tank ne pourra pas apprendre un sort de soin ou d'accélération — chaque skill a une liste d'archétypes autorisés.
+
 - Acquises par focus cumulé dans une activité spécifique
-- Arbre de compétences par créature
-- Exemples : "Récolte rapide", "Bouclier de concentration", "Pillage de donjon", "Régénération passive"
+- Arbre de compétences par créature, filtré selon l'archétype de la créature
+- Restriction de classe : chaque skill définit les archétypes qui peuvent l'apprendre
+- Exemples :
+  - "Bouclier de concentration" → Gardien, Paladin
+  - "Frappe rapide" → Éclaireur, Assassin
+  - "Drain vital" → Sorcier, Ombre
+  - "Bénédiction" → Prêtre, Séraphin
+  - "Récolte rapide" → Tous
+  - "Pillage de donjon" → Éclaireur, Assassin, Ombre
 
 #### Collection
+- **3 créatures starter** au lancement
+- Chaque starter donne accès à un **arbre d'évolution branché** : 3 branches × 3 branches = **27 archétypes Légendaires** possibles
 - Système de rareté : Commun, Rare, Épique, Légendaire, Mythique
 - Obtention : œufs trouvés en donjon, récompenses de saison, événements
+- **Système de gacha** pour les œufs : OUI, mais **impossible d'acheter des œufs avec de l'argent réel**. L'argent investi n'impacte jamais le gacha.
 - Chaque créature a un **design unique** + variantes (skins)
 
 ### 2.2 Système de Focus
 
 #### Lancement d'une session
-1. Le joueur choisit la **durée** (15min, 25min, 45min, 1h, 2h, personnalisé)
+1. Le joueur choisit la **durée** (10min, 25min, 45min, 1h, 2h, personnalisé — **minimum 10 minutes**)
 2. Le joueur **assigne des missions** à ses créatures :
    - 🏕️ Récolte de ressources (bois, pierre, cristaux, nourriture)
    - ⚔️ Exploration de donjon
@@ -111,7 +125,7 @@ C'est la mécanique centrale qui rend chaque créature unique et personnelle.
 - Les créatures exécutent leurs missions en **temps réel**
 - Animation idle visible si le joueur revient (mais pas d'interaction possible)
 - **Bonus de streak** : sessions consécutives sans interruption = multiplicateur
-- **Interruption** = mission échouée, ressources perdues, créatures fatiguées
+- **Interruption** = réduction du multiplicateur de qualité (pas de perte directe de ressources, mais les récompenses finales sont diminuées)
 
 #### Qualité du focus
 | Qualité | Condition | Multiplicateur |
@@ -365,7 +379,12 @@ players: id, username, avatar, level, xp, energy_focus, crystals, created_at
 creatures: id, player_id, species_id, name, level, xp, stage, hp, energy,
            strength, endurance, intelligence, charisma, skin_id
 
--- Compétences
+-- Compétences (définition)
+skills: id, name, description, type(active|passive), cooldown,
+        allowed_archetypes[], element, tier, unlock_stage,
+        base_power, scaling_stat
+
+-- Compétences (acquises par créature)
 creature_skills: creature_id, skill_id, level, xp
 
 -- Sessions de focus
@@ -566,26 +585,26 @@ purchases: id, player_id, product_id, price, platform, purchased_at
 > À discuter et trancher ensemble avant/pendant l'implémentation.
 
 ### Game Design
-- [ ] **Nom du jeu** : FocusMon ? FocusPets ? ZenBeasts ? Autre ?
-- [ ] **Nombre de créatures au lancement** : 10 ? 20 ? 30 ?
+- [x] **Nom du jeu** : ~~FocusMon ? FocusPets ? ZenBeasts ?~~ → **Fokutchi** (décidé 2026-03-26)
+- [x] **Nombre de créatures au lancement** : ~~10 ? 20 ? 30 ?~~ → **3 starters → 27 archétypes Légendaires** (arbre branché 3×3×3) (décidé 2026-03-26)
 - [x] **Arbre d'évolution** : ~~Linéaire (A→B→C) ou branché~~ → **Branché, basé sur le pattern de focus** (décidé 2026-03-26)
-- [ ] **Timer minimum de focus** : 15min ? 10min ? 5min ?
-- [ ] **Pénalité d'interruption** : Perte de ressources ? Juste réduction du multiplicateur ?
-- [ ] **Équilibrage PvP** : Elo seul ou aussi basé sur le niveau des créatures ?
-- [ ] **Limite de créatures actives** : 3 ? 5 ? Illimité avec slots achetables ?
-- [ ] **Système de gacha pour les œufs** : Oui ($ mais engagement) ou Non (éthique mais moins de revenus) ?
+- [x] **Timer minimum de focus** : ~~15min ? 10min ? 5min ?~~ → **10 minutes minimum** (décidé 2026-03-26)
+- [x] **Pénalité d'interruption** : ~~Perte de ressources ?~~ → **Réduction du multiplicateur uniquement** (diminue les récompenses finales) (décidé 2026-03-26)
+- [x] **Équilibrage PvP** : ~~Elo seul ou aussi basé sur le niveau ?~~ → **Elo seul**. Si un joueur envoie un bébé contre des Légendaires, c'est son choix. (décidé 2026-03-26)
+- [x] **Limite de créatures actives** : ~~3 ? 5 ? Illimité ?~~ → **3 slots au lancement**, slots supplémentaires achetables. Les **équipes restent toujours composées de 3 créatures**. (décidé 2026-03-26)
+- [x] **Système de gacha pour les œufs** : ~~Oui/Non ?~~ → **Oui, MAIS impossible d'acheter des œufs avec de l'argent réel**. L'argent n'impacte jamais le gacha. (décidé 2026-03-26)
 
 ### Technique
-- [ ] **Offline-first ou online-required** : Le focus marche-t-il sans internet ?
+- [x] **Offline-first ou online-required** : ~~Le focus marche-t-il sans internet ?~~ → **Online obligatoire**. Le focus ne fonctionne pas sans connexion internet. (décidé 2026-03-26)
 - [ ] **Sprite-based ou vector-based** pour les créatures ?
 - [ ] **Lottie vs Skia natif** pour les animations de créatures ?
 - [ ] **Supabase seul ou ajouter Redis** pour le matchmaking/classements ?
 
 ### Business
-- [ ] **Plateforme de lancement** : Android d'abord, puis iOS ? Ou les deux simultanément ?
-- [ ] **Modèle freemium** : Quelles limitations pour les joueurs gratuits ?
-- [ ] **Âge cible** : 13-25 (étudiants) ? 18-35 (travailleurs) ? Les deux ?
-- [ ] **Partenariats** : Pomodoro apps, écoles, entreprises ?
+- [x] **Plateforme de lancement** : ~~Android d'abord ou les deux ?~~ → **Android uniquement au lancement**. iOS seulement si ça marche. (décidé 2026-03-26)
+- [x] **Modèle freemium** : ~~Quelles limitations ?~~ → **Aucune limitation pour les joueurs gratuits**. Ils auront simplement moins de récompenses et moins de cosmétiques. (décidé 2026-03-26)
+- [x] **Âge cible** : ~~13-25 ? 18-35 ?~~ → **13-35 ans** (étudiants + jeunes travailleurs) (décidé 2026-03-26)
+- [x] **Partenariats** : ~~Pomodoro apps, écoles, entreprises ?~~ → **Aucun partenariat pour le moment** (décidé 2026-03-26)
 
 ---
 
@@ -599,15 +618,26 @@ purchases: id, player_id, product_id, price, platform, purchased_at
 | 2026-03-26 | Évolutions divergentes basées sur le pattern de focus (durée, fréquence, horaire) | User |
 | 2026-03-26 | Ajout stats Concentration, Résistance, Vivacité, Persévérance | User |
 | 2026-03-26 | Guildes/Raids marquées "EN EXPLORATION" — 3 pistes documentées | User + Claude |
+| 2026-03-26 | Nom du jeu : Fokutchi | User |
+| 2026-03-26 | 3 starters → 27 archétypes Légendaires (arbre branché 3×3×3) | User |
+| 2026-03-26 | Timer minimum de focus : 10 minutes | User |
+| 2026-03-26 | Interruptions = réduction du multiplicateur uniquement | User |
+| 2026-03-26 | PvP Elo seul, pas de restriction par niveau | User |
+| 2026-03-26 | 3 slots créatures au lancement, slots achetables, équipes de 3 | User |
+| 2026-03-26 | Gacha pour les œufs, mais achat d'œufs impossible avec argent réel | User |
+| 2026-03-26 | App online-only, focus sans internet impossible | User |
+| 2026-03-26 | Lancement Android uniquement, iOS si succès | User |
+| 2026-03-26 | Aucune limitation pour joueurs gratuits (moins de récompenses/cosmétiques) | User |
+| 2026-03-26 | Âge cible : 13-35 ans | User |
+| 2026-03-26 | Ajout modèle de données `skills` avec restriction par archétype | User |
 | | | |
 
 ---
 
-> **STATUT** : EN ATTENTE DE VALIDATION
+> **STATUT** : EN COURS DE VALIDATION
 >
-> Ce plan est une proposition initiale. Chaque section doit être discutée, validée ou modifiée avant de commencer l'implémentation.
+> La majorité des questions ouvertes ont été tranchées. Quelques questions techniques restent ouvertes (sprites, animations, Redis).
 >
 > **Prochaines étapes** :
-> 1. Valider/modifier le game design (section 2)
-> 2. Trancher les questions ouvertes (section 6)
-> 3. Commencer Phase 0 (fondations)
+> 1. Trancher les questions techniques restantes (section 6)
+> 2. Commencer Phase 0 (fondations)
