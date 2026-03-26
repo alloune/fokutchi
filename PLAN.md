@@ -328,6 +328,7 @@ Revenus = Ads (60%) + Battle Pass (25%) + IAP cosmétiques (15%)
 | **Navigation** | Expo Router | File-based routing, deep links |
 | **Backend** | Supabase (PostgreSQL + Auth + Realtime) | Temps réel, auth, DB, stockage, pas de serveur à gérer |
 | **Game Logic Server** | Supabase Edge Functions (Deno) | Validation anti-triche, résolution des combats |
+| **Queue / Cache** | Redis + BullMQ | Queue de résolution de combats, matchmaking, classements temps réel |
 | **Push Notifications** | Expo Notifications + FCM/APNs | Rappels de focus, résultats de combat |
 | **Ads** | Google AdMob (react-native-google-mobile-ads) | Standard industrie, rewarded videos |
 | **IAP** | react-native-iap | Achats in-app cross-platform |
@@ -577,6 +578,10 @@ purchases: id, player_id, product_id, price, platform, purchased_at
 | **Tour bidirectionnelle Divin/Infernal** | ✅ RETENU | Vector art, choix de direction, loot différencié, pas de morale bien/mal |
 | **Pixel art / Sprite-based** | ❌ Écarté | Fichiers binaires opaques, non modifiables par IA, chaque frame dessinée manuellement |
 | **Vector-based (SVG/paths Skia)** | ✅ RETENU | Code lisible par IA, skeleton animation, itération rapide, IA-driven development |
+| **Lottie (JSON After Effects)** | ❌ Écarté | JSON verbeux/fragile, nécessite outil externe, animations figées après export |
+| **Skia natif (paths + reanimated)** | ✅ RETENU | Code TypeScript standard maîtrisé par l'IA, animations dynamiques liées aux stats à runtime |
+| **Supabase seul (pas de Redis)** | ❌ Écarté | Risque de surcharge DB si beaucoup de combats simultanés en fin de focus |
+| **Supabase + Redis/BullMQ** | ✅ RETENU | Queue de résolution de combats, matchmaking, classements — absorbe les pics de charge |
 | **Évolution par choix du joueur** | ❌ Écarté | L'évolution doit ÉMERGER du pattern de focus, pas être choisie manuellement |
 | **Évolution par pattern de focus** | ✅ RETENU | Sessions longues → Concentration/Résistance. Sessions courtes multiples → Vivacité/Persévérance. Rend chaque créature unique |
 
@@ -599,8 +604,8 @@ purchases: id, player_id, product_id, price, platform, purchased_at
 ### Technique
 - [x] **Offline-first ou online-required** : ~~Le focus marche-t-il sans internet ?~~ → **Online obligatoire**. Le focus ne fonctionne pas sans connexion internet. (décidé 2026-03-26)
 - [x] **Sprite-based ou vector-based** : ~~Sprite/Pixel ?~~ → **Vector-based (SVG/paths Skia)**. Les formes vectorielles sont du code, directement lisible et modifiable par l'IA. Skeleton-based animation = 1 modèle + transformations codées, au lieu de centaines de sprites dessinés. Approche IA-driven development. (décidé 2026-03-26)
-- [ ] **Lottie vs Skia natif** pour les animations de créatures ? (Vector dans les deux cas, à trancher)
-- [ ] **Supabase seul ou ajouter Redis** pour le matchmaking/classements ?
+- [x] **Lottie vs Skia natif** : ~~Lottie ?~~ → **Skia natif**. Le code est du TypeScript standard que l'IA maîtrise parfaitement, pas de JSON Lottie verbeux/fragile exporté depuis un outil externe. Permet des animations dynamiques liées aux stats des créatures à runtime. (décidé 2026-03-26)
+- [x] **Supabase seul ou ajouter Redis** : ~~Supabase seul ?~~ → **Supabase + Redis (BullMQ)**. Supabase pour auth/data/realtime. Redis pour le matchmaking, les classements, et une **queue de résolution de combats** (évite la surcharge DB si beaucoup de combats simultanés en fin de focus). (décidé 2026-03-26)
 
 ### Business
 - [x] **Plateforme de lancement** : ~~Android d'abord ou les deux ?~~ → **Android uniquement au lancement**. iOS seulement si ça marche. (décidé 2026-03-26)
@@ -633,14 +638,15 @@ purchases: id, player_id, product_id, price, platform, purchased_at
 | 2026-03-26 | Âge cible : 13-35 ans | User |
 | 2026-03-26 | Ajout modèle de données `skills` avec restriction par archétype | User |
 | 2026-03-26 | Vector-based (SVG/paths Skia) au lieu de pixel art — approche IA-driven | User |
+| 2026-03-26 | Skia natif au lieu de Lottie — code TS manipulable par IA, animations dynamiques | User |
+| 2026-03-26 | Ajout Redis + BullMQ pour queue de combats, matchmaking et classements | User |
 | | | |
 
 ---
 
-> **STATUT** : EN COURS DE VALIDATION
+> **STATUT** : VALIDÉ — PRÊT POUR IMPLÉMENTATION
 >
-> La majorité des questions ouvertes ont été tranchées. Quelques questions techniques restent ouvertes (sprites, animations, Redis).
+> Toutes les questions ouvertes ont été tranchées (16/16).
 >
-> **Prochaines étapes** :
-> 1. Trancher les questions techniques restantes (section 6)
-> 2. Commencer Phase 0 (fondations)
+> **Prochaine étape** :
+> 1. Commencer Phase 0 (fondations)
