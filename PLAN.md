@@ -574,7 +574,9 @@ purchases: id, player_id, product_id, price, platform, purchased_at
 | **Animations de combat détaillées** | ❌ Écarté | Trop coûteux en dev, pas le core du jeu. Animations symboliques suffisantes (secousse donjon, nuage de poussière PvP) |
 | **Animations minimalistes + résumé** | ✅ RETENU | Nuage de poussière pour PvP, secousse de tour pour donjons + résumé textuel. Simple, efficace, peu coûteux |
 | **Donjons horizontaux classiques** | ❌ Écarté | Remplacé par la Tour bidirectionnelle (haut/divin, bas/infernal) — plus original, plus de rejouabilité |
-| **Tour bidirectionnelle Divin/Infernal** | ✅ RETENU | Pixel art, choix de direction, loot différencié, pas de morale bien/mal |
+| **Tour bidirectionnelle Divin/Infernal** | ✅ RETENU | Vector art, choix de direction, loot différencié, pas de morale bien/mal |
+| **Pixel art / Sprite-based** | ❌ Écarté | Fichiers binaires opaques, non modifiables par IA, chaque frame dessinée manuellement |
+| **Vector-based (SVG/paths Skia)** | ✅ RETENU | Code lisible par IA, skeleton animation, itération rapide, IA-driven development |
 | **Évolution par choix du joueur** | ❌ Écarté | L'évolution doit ÉMERGER du pattern de focus, pas être choisie manuellement |
 | **Évolution par pattern de focus** | ✅ RETENU | Sessions longues → Concentration/Résistance. Sessions courtes multiples → Vivacité/Persévérance. Rend chaque créature unique |
 
@@ -596,8 +598,8 @@ purchases: id, player_id, product_id, price, platform, purchased_at
 
 ### Technique
 - [x] **Offline-first ou online-required** : ~~Le focus marche-t-il sans internet ?~~ → **Online obligatoire**. Le focus ne fonctionne pas sans connexion internet. (décidé 2026-03-26)
-- [ ] **Sprite-based ou vector-based** pour les créatures ?
-- [ ] **Lottie vs Skia natif** pour les animations de créatures ?
+- [x] **Sprite-based ou vector-based** : ~~Sprite/Pixel ?~~ → **Vector-based (SVG/paths Skia)**. Les formes vectorielles sont du code, directement lisible et modifiable par l'IA. Skeleton-based animation = 1 modèle + transformations codées, au lieu de centaines de sprites dessinés. Approche IA-driven development. (décidé 2026-03-26)
+- [ ] **Lottie vs Skia natif** pour les animations de créatures ? (Vector dans les deux cas, à trancher)
 - [ ] **Supabase seul ou ajouter Redis** pour le matchmaking/classements ?
 
 ### Business
@@ -630,6 +632,7 @@ purchases: id, player_id, product_id, price, platform, purchased_at
 | 2026-03-26 | Aucune limitation pour joueurs gratuits (moins de récompenses/cosmétiques) | User |
 | 2026-03-26 | Âge cible : 13-35 ans | User |
 | 2026-03-26 | Ajout modèle de données `skills` avec restriction par archétype | User |
+| 2026-03-26 | Vector-based (SVG/paths Skia) au lieu de pixel art — approche IA-driven | User |
 | | | |
 
 ---
