@@ -1,6 +1,7 @@
 # Fokutchi — Plan Directeur
 
 > App de focalisation gamifiée style Tamagotchi × Forest, multijoueur, avec monétisation ads + IAP.
+> **Stratégie** : POC web d'abord → export mobile (React Native) si validation du concept.
 > Ce document trace TOUTES les décisions : ce qui a été proposé, retenu, écarté, et pourquoi.
 
 ---
@@ -119,11 +120,12 @@ Un tank ne pourra pas apprendre un sort de soin ou d'accélération — chaque s
    - 📖 Apprentissage de compétence
    - 💤 Régénération (récupère PV/énergie)
    - 🛡️ Défense de la base (PvP défensif)
-3. Le joueur verrouille son téléphone et se concentre
+3. Le joueur lance le focus — **l'onglet reste ouvert, le joueur se concentre**
 
 #### Pendant le focus
 - Les créatures exécutent leurs missions en **temps réel**
-- Animation idle visible si le joueur revient (mais pas d'interaction possible)
+- Animation idle visible sur l'onglet (mais pas d'interaction possible)
+- **Détection d'interruption** : Page Visibility API — si le joueur quitte l'onglet, c'est une interruption
 - **Bonus de streak** : sessions consécutives sans interruption = multiplicateur
 - **Interruption** = réduction du multiplicateur de qualité (pas de perte directe de ressources, mais les récompenses finales sont diminuées)
 
@@ -317,33 +319,40 @@ Revenus = Ads (60%) + Battle Pass (25%) + IAP cosmétiques (15%)
 
 ## 3. Architecture Technique
 
-### 3.1 Stack retenu
+### 3.1 Stack retenu (Web POC)
+
+> **Stratégie** : Web-first POC. Si le concept est validé, migration vers React Native pour mobile.
+> Le choix de React + Zustand + Supabase rend cette migration naturelle (mêmes libs, même logique).
 
 | Couche | Technologie | Justification |
 |--------|-------------|---------------|
-| **Frontend** | React Native + Expo | Cross-platform, productivité dev, large écosystème |
-| **Rendu 2D** | react-native-skia | Animations fluides, shaders, particules, rendu custom |
-| **Animations** | react-native-reanimated + Skia | 60fps, animations thread UI séparé |
-| **State Management** | Zustand | Léger, performant, immutable-friendly |
-| **Navigation** | Expo Router | File-based routing, deep links |
+| **Frontend** | React + Vite | Rapide, léger, écosystème mature, migration facile vers RN |
+| **Rendu 2D** | HTML Canvas API + SVG | Natif navigateur, pas de dépendance lourde, vector-based |
+| **Animations** | Canvas API + requestAnimationFrame | 60fps, skeleton animation codée en TS, zéro dépendance |
+| **State Management** | Zustand | Léger, performant, immutable-friendly (identique en RN) |
+| **Routing** | React Router | SPA, navigation fluide |
 | **Backend** | Supabase (PostgreSQL + Auth + Realtime) | Temps réel, auth, DB, stockage, pas de serveur à gérer |
 | **Game Logic Server** | Supabase Edge Functions (Deno) | Validation anti-triche, résolution des combats |
 | **Queue / Cache** | Redis + BullMQ | Queue de résolution de combats, matchmaking, classements temps réel |
-| **Push Notifications** | Expo Notifications + FCM/APNs | Rappels de focus, résultats de combat |
-| **Ads** | Google AdMob (react-native-google-mobile-ads) | Standard industrie, rewarded videos |
-| **IAP** | react-native-iap | Achats in-app cross-platform |
+| **Focus Detection** | Page Visibility API | `document.hidden` + `visibilitychange` event → détecte quand le joueur quitte l'onglet |
+| **Notifications** | Web Push API + Supabase Realtime | Rappels de focus, résultats de combat |
+| **Ads** | Google AdSense | Standard web, rewarded ads via interstitiels |
+| **Paiements** | Stripe | Cosmétiques, Battle Pass — pas de commission app store |
 | **Analytics** | Mixpanel ou Amplitude | Suivi rétention, funnels, A/B tests |
-| **CI/CD** | EAS Build + EAS Submit | Build cloud, soumission stores automatisée |
+| **Déploiement** | Vercel | Deploy instantané, preview par PR, CDN global |
 
-### 3.2 Architecture serveur
+### 3.2 Architecture
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                    Client (React Native)             │
+│                 Client (React SPA)                   │
 │  ┌──────────┐  ┌──────────┐  ┌──────────────────┐  │
-│  │  Skia    │  │  Game    │  │  Network Layer   │  │
-│  │  Canvas  │  │  State   │  │  (Supabase SDK)  │  │
+│  │  Canvas  │  │  Game    │  │  Network Layer   │  │
+│  │  + SVG   │  │  State   │  │  (Supabase SDK)  │  │
 │  └──────────┘  └──────────┘  └──────────────────┘  │
+│  ┌──────────────────────────────────────────────┐   │
+│  │  Page Visibility API (focus detection)       │   │
+│  └──────────────────────────────────────────────┘   │
 └─────────────────────┬───────────────────────────────┘
                       │
                       ▼
@@ -354,13 +363,33 @@ Revenus = Ads (60%) + Battle Pass (25%) + IAP cosmétiques (15%)
 │  │  (JWT)   │  │  (WS)   │  │  (Game Logic)    │  │
 │  └──────────┘  └──────────┘  └──────────────────┘  │
 │  ┌──────────┐  ┌──────────┐  ┌──────────────────┐  │
-│  │  PostGIS │  │  Storage │  │  Row Level       │  │
+│  │PostgreSQL│  │  Storage │  │  Row Level       │  │
 │  │  (DB)    │  │  (Assets)│  │  Security (RLS)  │  │
 │  └──────────┘  └──────────┘  └──────────────────┘  │
+└────────────────────┬────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────┐
+│              Redis + BullMQ                          │
+│  ┌──────────────┐  ┌──────────┐  ┌──────────────┐  │
+│  │ Combat Queue │  │Matchmaker│  │ Leaderboards │  │
+│  └──────────────┘  └──────────┘  └──────────────┘  │
 └─────────────────────────────────────────────────────┘
 ```
 
-### 3.3 Anti-triche
+### 3.3 Stratégie de migration Web → Mobile
+
+Si le POC web est validé :
+1. **React → React Native** : même composants, même logique, adaptation UI
+2. **Canvas/SVG → react-native-skia** : même approche vector, portage des paths
+3. **Zustand** : identique, aucun changement
+4. **Supabase** : identique, même SDK
+5. **React Router → Expo Router** : migration mécanique
+6. **Page Visibility API → AppState API** : même concept, API différente
+7. **Stripe → react-native-iap** : pour les stores
+8. **AdSense → AdMob** : même réseau Google
+
+### 3.4 Anti-triche
 
 **Critique** pour un jeu compétitif :
 - Le **timer de focus** est validé côté serveur (start/end timestamps)
@@ -369,6 +398,7 @@ Revenus = Ads (60%) + Battle Pass (25%) + IAP cosmétiques (15%)
 - Le serveur valide : durée cohérente, pas de manipulation de timestamps
 - Les combats PvP sont **résolus côté serveur**
 - Rate limiting sur les appels API
+- **Web spécifique** : les événements `visibilitychange` sont envoyés au serveur en temps réel, le serveur détecte les incohérences (ex: aucune interruption sur 2h → suspect)
 
 ### 3.4 Modèle de données (schéma simplifié)
 
@@ -426,22 +456,22 @@ purchases: id, player_id, product_id, price, platform, purchased_at
 
 ## 4. Phases d'implémentation
 
-### Phase 0 — Fondations (Semaines 1-2)
-**Objectif** : Projet bootable, CI/CD, navigation de base
+### Phase 0 — Fondations Web (Semaines 1-2)
+**Objectif** : Projet bootable, déployé, navigation de base
 
-- [ ] Init Expo + React Native
-- [ ] Setup react-native-skia
+- [ ] Init React + Vite + TypeScript
+- [ ] Setup Canvas/SVG pour le rendu 2D
 - [ ] Setup Supabase (auth, DB, migrations)
-- [ ] Navigation de base (Expo Router)
-- [ ] Écrans placeholder : Home, Focus, Créatures, Profil
-- [ ] CI/CD avec EAS Build
+- [ ] Routing (React Router)
+- [ ] Pages placeholder : Home, Focus, Créatures, Profil
+- [ ] Déploiement Vercel (CI/CD automatique)
 - [ ] Design system (couleurs, typographie, composants de base)
 
 ### Phase 1 — Core Focus Loop (Semaines 3-5)
 **Objectif** : Le joueur peut faire un focus et être récompensé
 
-- [ ] Timer de focus (countdown, background timer)
-- [ ] Détection d'interruption (app state changes)
+- [ ] Timer de focus (countdown visible sur l'onglet)
+- [ ] Détection d'interruption (Page Visibility API — `visibilitychange`)
 - [ ] Calcul de qualité de focus
 - [ ] Récompenses de base (EF, XP)
 - [ ] Affichage résumé post-focus
@@ -453,12 +483,12 @@ purchases: id, player_id, product_id, price, platform, purchased_at
 **Objectif** : Les créatures sont vivantes et évoluent
 
 - [ ] Système d'évolution (stages, XP requis)
-- [ ] Animations Skia des créatures (idle, happy, tired, evolving)
-- [ ] Système de compétences (arbre, apprentissage)
+- [ ] Animations Canvas/SVG des créatures (idle, happy, tired, evolving)
+- [ ] Système de compétences (arbre, apprentissage, restrictions par archétype)
 - [ ] Habitat de base (vue de la maison)
 - [ ] Système de récolte de ressources
 - [ ] Régénération des créatures
-- [ ] 5-10 espèces de créatures designées
+- [ ] 3 espèces starter designées (vector-based)
 - [ ] Collection et bestiaire
 
 ### Phase 3 — Économie & Crafting (Semaines 10-12)
@@ -480,7 +510,7 @@ purchases: id, player_id, product_id, price, platform, purchased_at
 - [ ] Système de loot
 - [ ] Boss de donjon
 - [ ] Difficulté progressive
-- [ ] Animations de combat Skia
+- [ ] Animations de combat Canvas
 
 ### Phase 5 — PvP & Multijoueur (Semaines 17-20)
 **Objectif** : Compétition entre joueurs
@@ -506,15 +536,15 @@ purchases: id, player_id, product_id, price, platform, purchased_at
 ### Phase 7 — Monétisation (Semaines 25-27)
 **Objectif** : Revenus
 
-- [ ] Intégration AdMob (rewarded videos)
+- [ ] Intégration Google AdSense (rewarded interstitiels)
 - [ ] Pub post-focus pour bonus
 - [ ] Pub pré-donjon pour vie supplémentaire
-- [ ] IAP : skins de créatures
-- [ ] IAP : thèmes d'habitat
-- [ ] IAP : environnements de focus
-- [ ] IAP : bannières et cadres
+- [ ] Stripe : skins de créatures
+- [ ] Stripe : thèmes d'habitat
+- [ ] Stripe : environnements de focus
+- [ ] Stripe : bannières et cadres
 - [ ] Battle Pass (gratuit + premium)
-- [ ] Validation des achats côté serveur
+- [ ] Validation des paiements côté serveur (Stripe webhooks)
 
 ### Phase 8 — Saisons & Events (Semaines 28-30)
 **Objectif** : Contenu vivant
@@ -530,12 +560,25 @@ purchases: id, player_id, product_id, price, platform, purchased_at
 
 - [ ] Optimisation performances (60fps constant)
 - [ ] Tests de charge serveur
-- [ ] Localisation (FR, EN, JP, KR minimum)
+- [ ] Localisation (FR, EN minimum)
 - [ ] Accessibilité
 - [ ] Onboarding complet
 - [ ] Analytics et A/B testing
 - [ ] Beta fermée → Beta ouverte → Lancement
-- [ ] ASO (App Store Optimization)
+- [ ] SEO + partage social (Open Graph)
+
+### Phase 10 — Migration Mobile (si POC validé)
+**Objectif** : Export vers React Native pour Android puis iOS
+
+- [ ] Migration React → React Native + Expo
+- [ ] Canvas/SVG → react-native-skia
+- [ ] React Router → Expo Router
+- [ ] Page Visibility API → AppState API
+- [ ] AdSense → AdMob
+- [ ] Stripe → react-native-iap (pour stores)
+- [ ] Tests sur Android
+- [ ] Soumission Google Play
+- [ ] (Optionnel) Adaptation iOS + soumission App Store
 
 ---
 
@@ -545,7 +588,8 @@ purchases: id, player_id, product_id, price, platform, purchased_at
 
 | Option | Verdict | Raison |
 |--------|---------|--------|
-| **React Native + Skia** | ✅ RETENU | Cross-platform, bon pour 2D, productivité dev, écosystème mature |
+| **React + Vite (Web POC)** | ✅ RETENU | Déploiement instantané, zéro friction distribution, pas de validation store, migration facile vers RN |
+| React Native + Skia (mobile) | ⏸️ Phase 10 | Prévu pour la migration mobile si le POC web est validé |
 | Flutter + Flame | ❌ Écarté | Flame est moins mature que Skia pour les animations custom, écosystème de packages gaming plus limité |
 | Unity + C# | ❌ Écarté | Overkill pour un jeu principalement UI-driven, package lourd, complexité inutile |
 | Kotlin natif + Compose | ❌ Écarté | Pas cross-platform, devrait refaire tout pour iOS |
@@ -608,7 +652,7 @@ purchases: id, player_id, product_id, price, platform, purchased_at
 - [x] **Supabase seul ou ajouter Redis** : ~~Supabase seul ?~~ → **Supabase + Redis (BullMQ)**. Supabase pour auth/data/realtime. Redis pour le matchmaking, les classements, et une **queue de résolution de combats** (évite la surcharge DB si beaucoup de combats simultanés en fin de focus). (décidé 2026-03-26)
 
 ### Business
-- [x] **Plateforme de lancement** : ~~Android d'abord ou les deux ?~~ → **Android uniquement au lancement**. iOS seulement si ça marche. (décidé 2026-03-26)
+- [x] **Plateforme de lancement** : ~~Android d'abord ou les deux ?~~ → **Web d'abord (POC)**. Migration mobile (Android puis iOS) si le concept est validé. (mis à jour 2026-03-27)
 - [x] **Modèle freemium** : ~~Quelles limitations ?~~ → **Aucune limitation pour les joueurs gratuits**. Ils auront simplement moins de récompenses et moins de cosmétiques. (décidé 2026-03-26)
 - [x] **Âge cible** : ~~13-25 ? 18-35 ?~~ → **13-35 ans** (étudiants + jeunes travailleurs) (décidé 2026-03-26)
 - [x] **Partenariats** : ~~Pomodoro apps, écoles, entreprises ?~~ → **Aucun partenariat pour le moment** (décidé 2026-03-26)
@@ -640,6 +684,10 @@ purchases: id, player_id, product_id, price, platform, purchased_at
 | 2026-03-26 | Vector-based (SVG/paths Skia) au lieu de pixel art — approche IA-driven | User |
 | 2026-03-26 | Skia natif au lieu de Lottie — code TS manipulable par IA, animations dynamiques | User |
 | 2026-03-26 | Ajout Redis + BullMQ pour queue de combats, matchmaking et classements | User |
+| 2026-03-27 | **PIVOT WEB-FIRST** : POC web (React+Vite) avant mobile. Migration RN si validé | User |
+| 2026-03-27 | Stack : React+Vite, Canvas/SVG, React Router, Vercel, Stripe, AdSense, Web Push | User |
+| 2026-03-27 | Focus detection : Page Visibility API au lieu de AppState | User |
+| 2026-03-27 | Ajout Phase 10 — Migration Mobile (si POC validé) | User |
 | | | |
 
 ---
